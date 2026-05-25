@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>QR Scanner</title>
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <style>
+        body {
+            font-family: Arial;
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        #reader {
+            width: 300px;
+            margin: auto;
+        }
+
+        #log {
+            margin-top: 20px;
+        }
+
+        button {
+            margin-top: 15px;
+            padding: 10px 15px;
+        }
+
+        #downloadBtn {
+            margin-top: 15px;
+            padding: 10px 15px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+
+        #downloadBtn:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h2>QR Code Scanner</h2>
+
+    <div id="reader"></div>
+
+    <div id="log">Waiting for scan...</div>
+
+    <button id="restartBtn" style="display:none;">Restart Scanner</button>
+    <button id="downloadBtn">Download Excel Log</button>
+
+    <script>
+        const downloadBtn = document.getElementById("downloadBtn");
+
+        downloadBtn.addEventListener("click", () => {
+            window.location.href = "http://localhost:3000/download-log";
+        });
+    </script>
+
+
+    <script>
+        let html5QrCode;
+        let isScanning = true;
+
+        const logDiv = document.getElementById("log");
+        const restartBtn = document.getElementById("restartBtn");
+
+        function sendToServer(qr) {
+            fetch("http://localhost:3000/scan", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ qr })
+            })
+                .then(res => res.json())
+                .then(data => {
+                    logDiv.innerHTML = `
+            <p><b>QR:</b> ${data.qr}</p>
+            <p><b>Timestamp:</b> ${data.timestamp}</p>
+        `;
+                });
+        }
+
+        function startScanner() {
+            html5QrCode = new Html5Qrcode("reader");
+
+            Html5Qrcode.getCameras().then(devices => {
+                if (devices && devices.length) {
+                    const cameraId = devices[0].id;
+
+                    html5QrCode.start(
+                        cameraId,
+                        {
+                            fps: 10,
+                            qrbox: 250
+                        },
+                        (decodedText) => {
+                            if (!isScanning) return;
+
+                            isScanning = false;
+
+                            sendToServer(decodedText);
+
+                            html5QrCode.stop().then(() => {
+                                document.getElementById("reader").innerHTML = "";
+                                restartBtn.style.display = "inline-block";
+                            });
+                        }
+                    );
+                }
+            });
+        }
+
+        restartBtn.addEventListener("click", () => {
+            isScanning = true;
+            restartBtn.style.display = "none";
+            logDiv.innerHTML = "Waiting for scan...";
+            startScanner();
+        });
+
+        startScanner();
+    </script>
+
+</body>
+
+</html>
